@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "478246876140",
+    "project_id": "study-notes-app2",
+    "storage_bucket": "study-notes-app2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478246876140:android:6f2f7fafcdc919eaabc6c9",
+        "android_client_info": {
+          "package_name": "com.example.projeakademix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDNJH26RPGIRPyipeV0hSPsspN50W_rV4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
