@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:projeakademix/services/auth_service.dart';
 import 'signup_page.dart';
+import 'home_page.dart'; // Giriş sonrası yönlendirme için
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -9,13 +11,40 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  late String _username;
+  late String _email;
   late String _password;
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService(); // AuthService örneği
+
+  Future<void> _signIn() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+
+      try {
+        // Firebase ile giriş yap
+        await _authService.signIn(_email, _password);
+
+        // Başarılı giriş sonrası yönlendirme
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomePage(firstName: '', lastName: ''),
+          ),
+        );
+      } catch (e) {
+        // Hata mesajını göster
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset:
+          true, // Klavye açıldığında ekran yeniden boyutlandırılır
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -28,11 +57,10 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(20),
           child: Center(
             child: Form(
-              key: _formKey, // Form widgetini ekliyoruz
+              key: _formKey,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  //Image.asset('../assets/images/1.png', width: 100, height: 100),
                   SizedBox(height: 20),
                   Text(
                     'AkademiX',
@@ -44,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   SizedBox(height: 40),
                   TextFormField(
-                    autofocus: true, // Klavye otomatik olarak açılır
+                    autofocus: true,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.email, color: Colors.purple),
                       focusedBorder: OutlineInputBorder(
@@ -55,7 +83,6 @@ class _LoginPageState extends State<LoginPage> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      // Email format kontrolü
                       String pattern =
                           r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$';
                       RegExp regex = RegExp(pattern);
@@ -67,12 +94,12 @@ class _LoginPageState extends State<LoginPage> {
                       return null;
                     },
                     onSaved: (value) {
-                      _username = value!;
+                      _email = value!;
                     },
                   ),
                   SizedBox(height: 20),
                   TextFormField(
-                    obscureText: true, // Şifreyi gizle
+                    obscureText: true,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.lock, color: Colors.purple),
                       focusedBorder: OutlineInputBorder(
@@ -83,7 +110,6 @@ class _LoginPageState extends State<LoginPage> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      // Şifre kontrolü (en az 6 karakter)
                       if (value == null || value.isEmpty) {
                         return 'Şifrenizi giriniz';
                       } else if (value.length < 6) {
@@ -107,15 +133,7 @@ class _LoginPageState extends State<LoginPage> {
                         horizontal: 40,
                       ),
                     ),
-                    onPressed: () {
-                      // Formu kontrol et ve doğrulama yap
-                      if (_formKey.currentState!.validate()) {
-                        // Formu kaydet
-                        _formKey.currentState!.save();
-                        // Giriş işlemini burada yapabilirsiniz
-                        print('Email: $_username, Şifre: $_password');
-                      }
-                    },
+                    onPressed: _signIn, // Giriş yapma işlemi
                     child: Text("Giriş Yap", style: TextStyle(fontSize: 16)),
                   ),
                   SizedBox(height: 10),
@@ -137,7 +155,9 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          // Şifremi unuttum işlemi burada yapılabilir
+                        },
                         child: Text(
                           "Şifremi Unuttum",
                           style: TextStyle(color: Colors.white),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:projeakademix/services/auth_service.dart';
+import 'login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -9,15 +12,51 @@ class SignUpPage extends StatefulWidget {
 
 class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
   late String _firstName;
   late String _lastName;
   late String _email;
-  late String _password;
-  late String _confirmPassword;
+
+  final AuthService _authService = AuthService(); // AuthService örneği
+
+  Future<void> _signUp() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+
+      try {
+        // Firebase ile kullanıcı kaydı
+        await _authService.signUp(
+          _email,
+          _passwordController.text,
+          _firstName,
+          _lastName,
+        );
+
+        // Başarılı kayıt sonrası giriş sayfasına yönlendirme
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Kayıt başarılı!")));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } catch (e) {
+        // Hata mesajını göster
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset:
+          true, // Klavye açıldığında ekran yeniden boyutlandırılır
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -91,7 +130,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     validator: (value) {
                       String pattern =
-                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}\$';
+                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$';
                       RegExp regex = RegExp(pattern);
                       if (value == null || value.isEmpty) {
                         return 'Email adresinizi giriniz';
@@ -106,6 +145,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                   SizedBox(height: 10),
                   TextFormField(
+                    controller: _passwordController,
                     obscureText: true,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.lock, color: Colors.blue),
@@ -121,12 +161,10 @@ class _SignUpPageState extends State<SignUpPage> {
                       }
                       return null;
                     },
-                    onSaved: (value) {
-                      _password = value!;
-                    },
                   ),
                   SizedBox(height: 10),
                   TextFormField(
+                    controller: _confirmPasswordController,
                     obscureText: true,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.lock_outline, color: Colors.blue),
@@ -137,13 +175,10 @@ class _SignUpPageState extends State<SignUpPage> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Şifrenizi tekrar giriniz';
-                      } else if (value != _password) {
+                      } else if (value != _passwordController.text) {
                         return 'Şifreler eşleşmiyor';
                       }
                       return null;
-                    },
-                    onSaved: (value) {
-                      _confirmPassword = value!;
                     },
                   ),
                   SizedBox(height: 20),
@@ -158,14 +193,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         horizontal: 40,
                       ),
                     ),
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        _formKey.currentState!.save();
-                        print(
-                          'Kullanıcı Adı: $_firstName $_lastName, Email: $_email',
-                        );
-                      }
-                    },
+                    onPressed: _signUp, // Firebase'e kullanıcı kaydetme işlemi
                     child: Text("Kayıt Ol", style: TextStyle(fontSize: 16)),
                   ),
                   SizedBox(height: 10),
