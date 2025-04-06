@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -16,6 +17,17 @@ class AuthService {
 
       // Kullanıcı bilgilerini güncelle
       await userCredential.user?.updateDisplayName("$firstName $lastName");
+
+      // Firestore'a kullanıcı bilgilerini kaydet
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user?.uid)
+          .set({
+            'firstName': firstName,
+            'lastName': lastName,
+            'email': email,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       return userCredential.user;
     } on FirebaseAuthException catch (e) {

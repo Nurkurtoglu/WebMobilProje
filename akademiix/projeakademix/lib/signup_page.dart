@@ -81,7 +81,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 20),
+                  SizedBox(height: 5),
                   TextFormField(
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.person, color: Colors.blue),
@@ -99,7 +99,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       _firstName = value!;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 5),
                   TextFormField(
                     decoration: InputDecoration(
                       prefixIcon: Icon(
@@ -120,7 +120,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       _lastName = value!;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 5),
                   TextFormField(
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.email, color: Colors.blue),
@@ -143,7 +143,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       _email = value!;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 5),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
@@ -162,7 +162,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 5),
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: true,

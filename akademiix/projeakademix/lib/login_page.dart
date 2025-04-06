@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:projeakademix/services/auth_service.dart';
+import 'profile_page.dart'; // Profil sayfası
 import 'signup_page.dart';
-import 'home_page.dart'; // Giriş sonrası yönlendirme için
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -22,13 +22,23 @@ class _LoginPageState extends State<LoginPage> {
 
       try {
         // Firebase ile giriş yap
-        await _authService.signIn(_email, _password);
+        final user = await _authService.signIn(_email, _password);
 
-        // Başarılı giriş sonrası yönlendirme
+        // Kullanıcı bilgilerini al
+        final userName = user?.displayName ?? "Bilinmeyen Kullanıcı";
+        final email = user?.email ?? "Bilinmeyen E-posta";
+
+        // Başarılı giriş sonrası profil sayfasına yönlendirme
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const HomePage(firstName: '', lastName: ''),
+            builder:
+                (context) => ProfilePage(
+                  userName: userName,
+                  email: email,
+                  firstName: null,
+                  lastName: null,
+                ),
           ),
         );
       } catch (e) {

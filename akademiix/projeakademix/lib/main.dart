@@ -7,11 +7,11 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MyApp());
+  runApp(const Uygulamam());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class Uygulamam extends StatelessWidget {
+  const Uygulamam({super.key});
 
   // This widget is the root of your application.
   @override
