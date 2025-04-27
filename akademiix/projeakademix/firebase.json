@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"study-notes-app2","appId":"1:478246876140:android:6f2f7fafcdc919eaabc6c9","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"study-notes-app2","configurations":{"android":"1:478246876140:android:6f2f7fafcdc919eaabc6c9","ios":"1:478246876140:ios:5bad4a494ec721b6abc6c9","macos":"1:478246876140:ios:5bad4a494ec721b6abc6c9","web":"1:478246876140:web:6cbf533782bdfd8babc6c9","windows":"1:478246876140:web:3958f21c3679fe21abc6c9"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "study-notes-app2",
+          "appId": "1:478246876140:android:6f2f7fafcdc919eaabc6c9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "study-notes-app2",
+          "configurations": {
+            "android": "1:478246876140:android:6f2f7fafcdc919eaabc6c9",
+            "ios": "1:478246876140:ios:5bad4a494ec721b6abc6c9",
+            "macos": "1:478246876140:ios:5bad4a494ec721b6abc6c9",
+            "web": "1:478246876140:web:6cbf533782bdfd8babc6c9",
+            "windows": "1:478246876140:web:3958f21c3679fe21abc6c9"
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

@@ -4,8 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart';
 import 'package:projeakademix/home_page.dart';
 import 'package:projeakademix/login_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfilePage extends StatefulWidget {
   final String userName;
@@ -31,15 +34,22 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx'], // İzin verilen dosya türleri
+        allowedExtensions: [
+          'pdf',
+          'doc',
+          'docx',
+          'jpg',
+          'png',
+        ], // Genişletilmiş formatlar
       );
 
       if (result != null) {
         final fileName = result.files.single.name;
+        debugPrint('Seçilen dosya adı: $fileName');
 
-        // Web platformu için bytes kullanımı
         if (result.files.single.bytes != null) {
           final fileBytes = result.files.single.bytes!;
+          debugPrint('Dosya boyutu (bytes): ${fileBytes.length}');
 
           // Firebase Storage'a dosya yükleme
           final storageRef = FirebaseStorage.instance.ref().child(
@@ -51,59 +61,79 @@ class _ProfilePageState extends State<ProfilePage> {
           // Yükleme tamamlandıktan sonra dosya URL'sini al
           final snapshot = await uploadTask.whenComplete(() {});
           final downloadUrl = await snapshot.ref.getDownloadURL();
+          debugPrint('Dosya başarıyla yüklendi: $downloadUrl');
 
           // Firestore'a dosya referansı ekleme
           await FirebaseFirestore.instance.collection('ders_notlari').add({
             'fileName': fileName,
             'fileUrl': downloadUrl,
             'userId': FirebaseAuth.instance.currentUser?.uid,
+            'userEmail': FirebaseAuth.instance.currentUser?.email,
             'timestamp': FieldValue.serverTimestamp(),
           });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Dosya başarıyla yüklendi: $fileName")),
-          );
-        }
-        // Mobil platform için path kullanımı
-        else if (result.files.single.path != null) {
-          final file = File(result.files.single.path!);
-
-          // Firebase Storage'a dosya yükleme
-          final storageRef = FirebaseStorage.instance.ref().child(
-            'ders_notlari/${FirebaseAuth.instance.currentUser?.uid}/$fileName',
-          );
-
-          final uploadTask = storageRef.putFile(file);
-
-          // Yükleme tamamlandıktan sonra dosya URL'sini al
-          final snapshot = await uploadTask.whenComplete(() {});
-          final downloadUrl = await snapshot.ref.getDownloadURL();
-
-          // Firestore'a dosya referansı ekleme
-          await FirebaseFirestore.instance.collection('ders_notlari').add({
-            'fileName': fileName,
-            'fileUrl': downloadUrl,
-            'userId': FirebaseAuth.instance.currentUser?.uid,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
+          debugPrint('Firestore\'a belge başarıyla eklendi.');
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Dosya başarıyla yüklendi: $fileName")),
           );
         } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Dosya seçimi iptal edildi.")));
+          throw Exception("Web platformunda dosya seçimi başarısız.");
         }
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Dosya seçimi iptal edildi.")));
+        throw Exception("Dosya seçimi iptal edildi.");
       }
+    } catch (e) {
+      debugPrint('Dosya yükleme hatası: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Bir hata oluştu: $e")));
+    }
+  }
+
+  Future<void> _addIlan(BuildContext context) async {
+    if (ilanBasligi.isEmpty || ilanAciklamasi.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Lütfen tüm alanları doldurun!")));
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('ilanlar').add({
+        'title': ilanBasligi,
+        'description': ilanAciklamasi,
+        'userId': FirebaseAuth.instance.currentUser?.uid,
+        'userEmail': FirebaseAuth.instance.currentUser?.email,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Özel ilan başarıyla paylaşıldı!")),
+      );
+
+      setState(() {
+        ilanBasligi = '';
+        ilanAciklamasi = '';
+      });
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Bir hata oluştu: $e")));
+    }
+  }
+
+  Future<void> _openFileInBrowser(String url, BuildContext context) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'URL açılamıyor: $url';
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Dosya açılamadı: $e")));
     }
   }
 
@@ -136,24 +166,27 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               // Kullanıcı Bilgileri
               Center(
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.blue.shade200,
-                  child: Icon(Icons.person, size: 50, color: Colors.white),
-                ),
-              ),
-              SizedBox(height: 16),
-              Center(
-                child: Text(
-                  widget.userName,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ),
-              SizedBox(height: 8),
-              Center(
-                child: Text(
-                  widget.email,
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.blue.shade200,
+                      child: Icon(Icons.person, size: 50, color: Colors.white),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      widget.userName,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      widget.email,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(height: 24),
@@ -186,37 +219,69 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               SizedBox(height: 8),
               ElevatedButton(
-                onPressed: () {
-                  // Boş alan kontrolü
-                  if (ilanBasligi.isEmpty || ilanAciklamasi.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Lütfen tüm alanları doldurun!")),
-                    );
-                    return;
-                  }
-
-                  // Firestore'a ilan ekleme
-                  FirebaseFirestore.instance.collection('ilanlar').add({
-                    'title': ilanBasligi,
-                    'description': ilanAciklamasi,
-                    'userId': FirebaseAuth.instance.currentUser?.uid,
-                    'timestamp': FieldValue.serverTimestamp(),
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Özel ilan paylaşıldı!")),
-                  );
-
-                  // Alanları temizleme
-                  setState(() {
-                    ilanBasligi = '';
-                    ilanAciklamasi = '';
-                  });
-                },
+                onPressed: () => _addIlan(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue.shade700,
                 ),
                 child: Text("İlanı Paylaş"),
+              ),
+              SizedBox(height: 24),
+
+              // Kullanıcı İlanları
+              Text(
+                "İlanlarınız",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              StreamBuilder<QuerySnapshot>(
+                stream:
+                    FirebaseFirestore.instance
+                        .collection('ilanlar')
+                        .where(
+                          'userId',
+                          isEqualTo:
+                              FirebaseAuth.instance.currentUser?.uid ?? '',
+                        )
+                        .orderBy('timestamp', descending: true)
+                        .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text("Bir hata oluştu: ${snapshot.error}"),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(child: Text("Henüz bir ilan paylaşılmamış."));
+                  }
+
+                  final ilanlar = snapshot.data!.docs;
+
+                  return ListView.builder(
+                    shrinkWrap: true, // Taşma hatasını önlemek için eklendi
+                    physics:
+                        NeverScrollableScrollPhysics(), // Ana kaydırma ile uyumlu
+                    itemCount: ilanlar.length,
+                    itemBuilder: (context, index) {
+                      final ilan = ilanlar[index];
+                      return Card(
+                        margin: EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          leading: Icon(Icons.announcement),
+                          title: Text(ilan['title'] ?? 'Başlık yok'),
+                          subtitle: Text(ilan['description'] ?? 'Açıklama yok'),
+                          onTap: () {
+                            // İlan detayına yönlendirme
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
               SizedBox(height: 24),
 
@@ -236,9 +301,9 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               SizedBox(height: 24),
 
-              // Kullanıcı Paylaşımları
+              // Kullanıcı Ders Notları
               Text(
-                "Paylaşımlarınız",
+                "Ders Notlarınız",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
@@ -248,7 +313,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         .collection('ders_notlari')
                         .where(
                           'userId',
-                          isEqualTo: FirebaseAuth.instance.currentUser?.uid,
+                          isEqualTo:
+                              FirebaseAuth.instance.currentUser?.uid ?? '',
                         )
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
@@ -265,29 +331,38 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return Center(
-                      child: Text("Henüz bir paylaşım yapılmamış."),
+                      child: Text("Henüz bir ders notu paylaşılmamış."),
                     );
                   }
 
-                  final notes = snapshot.data!.docs;
+                  final dersNotlari = snapshot.data!.docs;
 
                   return ListView.builder(
                     shrinkWrap: true, // Taşma hatasını önlemek için eklendi
                     physics:
                         NeverScrollableScrollPhysics(), // Ana kaydırma ile uyumlu
-                    itemCount: notes.length,
+                    itemCount: dersNotlari.length,
                     itemBuilder: (context, index) {
-                      final note = notes[index];
+                      final not = dersNotlari[index];
                       return Card(
                         margin: EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           leading: Icon(Icons.file_present),
-                          title: Text(note['fileName']),
+                          title: Text(not['fileName'] ?? 'Dosya adı yok'),
                           subtitle: Text(
-                            "Yükleme Tarihi: ${note['timestamp']?.toDate().toString() ?? 'Tarih yok'}",
+                            "Yükleme Tarihi: ${not['timestamp']?.toDate().toString() ?? 'Tarih yok'}",
                           ),
-                          onTap: () {
-                            // Dosya detayına yönlendirme veya indirme işlemi
+                          onTap: () async {
+                            final url = not['fileUrl'];
+                            if (url != null) {
+                              await _openFileInBrowser(url, context);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Dosya URL'si bulunamadı."),
+                                ),
+                              );
+                            }
                           },
                         ),
                       );

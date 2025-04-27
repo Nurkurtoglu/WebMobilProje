@@ -16,6 +16,11 @@ class AuthService {
       UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
 
+      // Kullanıcı null kontrolü
+      if (userCredential.user == null) {
+        throw Exception('Kullanıcı oluşturulamadı.');
+      }
+
       // Kullanıcı bilgilerini Firestore'a yaz
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'firstName': firstName,
@@ -27,7 +32,9 @@ class AuthService {
       // Kullanıcının displayName'ini Firebase Authentication'da güncelle
       await userCredential.user!.updateDisplayName('$firstName $lastName');
     } catch (e) {
+      // Hata durumunda kullanıcıya bilgi ver
       print('Kullanıcı kaydı sırasında hata oluştu: $e');
+      rethrow; // Hatanın üst katmana iletilmesi için
     }
   }
 }
