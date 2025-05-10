@@ -71,16 +71,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset:
-          true, // Klavye açıldığında ekran yeniden boyutlandırılır
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text("Profili Düzenle"),
-        backgroundColor: Colors.blue.shade700,
+        title: const Text(
+          "Profili Düzenle",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade800, Colors.blue.shade400],
+            ),
+          ),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.blue.shade100, Colors.blue.shade400],
+            colors: [Colors.blue.shade100, Colors.blue.shade300],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -89,12 +97,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
                 initialValue: _firstName,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Ad',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: Icon(Icons.person, color: Colors.blue.shade800),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -109,9 +123,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SizedBox(height: 10),
               TextFormField(
                 initialValue: _lastName,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Soyad',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: Icon(
+                    Icons.person_outline,
+                    color: Colors.blue.shade800,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -126,10 +148,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SizedBox(height: 10),
               TextFormField(
                 initialValue: _email,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Email',
-                  border: OutlineInputBorder(),
-                  hintText: 'ornek@example.com',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: Icon(Icons.email, color: Colors.blue.shade800),
                 ),
                 validator: (value) {
                   String pattern =
@@ -149,9 +175,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SizedBox(height: 10),
               TextFormField(
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Yeni Şifre',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: Icon(Icons.lock, color: Colors.blue.shade800),
                 ),
                 validator: (value) {
                   if (value != null && value.isNotEmpty && value.length < 6) {
@@ -164,19 +195,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 },
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade300,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+              Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade800,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 40,
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 40,
+                  onPressed: _updateProfile,
+                  child: const Text(
+                    "Kaydet",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
-                onPressed: _updateProfile,
-                child: const Text("Kaydet", style: TextStyle(fontSize: 16)),
               ),
             ],
           ),

@@ -55,162 +55,188 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset:
-          true, // Klavye açıldığında ekran yeniden boyutlandırılır
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade200, Colors.blue.shade700],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Kayıt Ol',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 5),
-                  TextFormField(
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.person, color: Colors.blue),
-                      labelText: 'Ad',
-                      labelStyle: TextStyle(color: Colors.blue),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Adınızı giriniz';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) {
-                      _firstName = value!;
-                    },
-                  ),
-                  SizedBox(height: 5),
-                  TextFormField(
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(
-                        Icons.person_outline,
-                        color: Colors.blue,
-                      ),
-                      labelText: 'Soyad',
-                      labelStyle: TextStyle(color: Colors.blue),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Soyadınızı giriniz';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) {
-                      _lastName = value!;
-                    },
-                  ),
-                  SizedBox(height: 5),
-                  TextFormField(
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.email, color: Colors.blue),
-                      labelText: 'Email',
-                      labelStyle: TextStyle(color: Colors.blue),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      String pattern =
-                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$';
-                      RegExp regex = RegExp(pattern);
-                      if (value == null || value.isEmpty) {
-                        return 'Email adresinizi giriniz';
-                      } else if (!regex.hasMatch(value)) {
-                        return 'Geçerli bir email adresi giriniz';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) {
-                      _email = value!;
-                    },
-                  ),
-                  SizedBox(height: 5),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.lock, color: Colors.blue),
-                      labelText: 'Şifre',
-                      labelStyle: TextStyle(color: Colors.blue),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Şifrenizi giriniz';
-                      } else if (value.length < 6) {
-                        return 'Şifre en az 6 karakter olmalıdır';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 5),
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.lock_outline, color: Colors.blue),
-                      labelText: 'Şifre Tekrar',
-                      labelStyle: TextStyle(color: Colors.blue),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Şifrenizi tekrar giriniz';
-                      } else if (value != _passwordController.text) {
-                        return 'Şifreler eşleşmiyor';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 40,
-                      ),
-                    ),
-                    onPressed: _signUp, // Firebase'e kullanıcı kaydetme işlemi
-                    child: Text("Kayıt Ol", style: TextStyle(fontSize: 16)),
-                  ),
-                  SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      "Giriş Yap",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade200, Colors.blue.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Kayıt Ol',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    TextFormField(
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.person, color: Colors.blue),
+                        labelText: 'Ad',
+                        labelStyle: TextStyle(color: Colors.blue),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Adınızı giriniz';
+                        }
+                        return null;
+                      },
+                      onSaved: (value) {
+                        _firstName = value!;
+                      },
+                    ),
+                    SizedBox(height: 5),
+                    TextFormField(
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(
+                          Icons.person_outline,
+                          color: Colors.blue,
+                        ),
+                        labelText: 'Soyad',
+                        labelStyle: TextStyle(color: Colors.blue),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Soyadınızı giriniz';
+                        }
+                        return null;
+                      },
+                      onSaved: (value) {
+                        _lastName = value!;
+                      },
+                    ),
+                    SizedBox(height: 5),
+                    TextFormField(
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.email, color: Colors.blue),
+                        labelText: 'Email',
+                        labelStyle: TextStyle(color: Colors.blue),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        String pattern =
+                            r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$';
+                        RegExp regex = RegExp(pattern);
+                        if (value == null || value.isEmpty) {
+                          return 'Email adresinizi giriniz';
+                        } else if (!regex.hasMatch(value)) {
+                          return 'Geçerli bir email adresi giriniz';
+                        }
+                        return null;
+                      },
+                      onSaved: (value) {
+                        _email = value!;
+                      },
+                    ),
+                    SizedBox(height: 5),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.lock, color: Colors.blue),
+                        labelText: 'Şifre',
+                        labelStyle: TextStyle(color: Colors.blue),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Şifrenizi giriniz';
+                        } else if (value.length < 6) {
+                          return 'Şifre en az 6 karakter olmalıdır';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 5),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(
+                          Icons.lock_outline,
+                          color: Colors.blue,
+                        ),
+                        labelText: 'Şifre Tekrar',
+                        labelStyle: TextStyle(color: Colors.blue),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Şifrenizi tekrar giriniz';
+                        } else if (value != _passwordController.text) {
+                          return 'Şifreler eşleşmiyor';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade800,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 40,
+                        ),
+                      ),
+                      onPressed:
+                          _signUp, // Firebase'e kullanıcı kaydetme işlemi
+                      child: Text(
+                        "Kayıt Ol",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        "Giriş Yap",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 20,
+            right: 20,
+            child: Text(
+              'AkademiX',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

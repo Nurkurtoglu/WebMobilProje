@@ -4,6 +4,7 @@ import 'package:projeakademix/login_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'initialize_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +12,9 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    debugPrint('Calling initializeFirestore...');
+    await initializeFirestore();
+    debugPrint('Firestore initialization completed.');
     runApp(const Uygulamam());
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
