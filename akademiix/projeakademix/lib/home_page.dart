@@ -5,6 +5,7 @@ import 'package:projeakademix/profile_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:projeakademix/login_page.dart';
 import 'package:projeakademix/edit_profile_page.dart';
+import 'package:projeakademix/search_results_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key, required this.firstName, required this.lastName})
@@ -43,6 +44,44 @@ class _HomePageState extends State<HomePage> {
           .orderBy('timestamp', descending: true)
           .snapshots();
 
+  // Updated search logic to allow partial matches
+  Stream<QuerySnapshot> getSearchStream() {
+    return FirebaseFirestore.instance
+        .collection('ders_notlari')
+        .where('fileName', isGreaterThanOrEqualTo: searchQuery.toLowerCase())
+        .where(
+          'fileName',
+          isLessThanOrEqualTo: searchQuery.toLowerCase() + '\uf8ff',
+        )
+        .orderBy('fileName')
+        .snapshots();
+  }
+
+  // Updated the stream for the "İlanlar" section to use the correct collection
+  Stream<QuerySnapshot> getIlanlarStream() {
+    return FirebaseFirestore.instance
+        .collection('ilanlar')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
+
+  // Added a method to fetch search results from Firebase based on the search query
+  Stream<QuerySnapshot> getSearchResults(String query) {
+    return FirebaseFirestore.instance
+        .collection('users') // Assuming 'users' is the collection to search
+        .where('name', isGreaterThanOrEqualTo: query)
+        .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+        .snapshots();
+  }
+
+  // Added a method to navigate to the search results page
+  void navigateToSearchResults(String query) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SearchResultsPage(query: query)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,6 +101,30 @@ class _HomePageState extends State<HomePage> {
                 context,
                 MaterialPageRoute(builder: (context) => LoginPage()),
               );
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.person),
+            onPressed: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => ProfilePage(
+                          userName: user.displayName ?? 'Kullanıcı',
+                          email: user.email ?? 'Email bulunamadı',
+                          firstName: null,
+                          lastName: null,
+                        ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Giriş yapmanız gerekiyor.')),
+                );
+              }
             },
           ),
         ],
@@ -118,19 +181,42 @@ class _HomePageState extends State<HomePage> {
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Ara...',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Ara...',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onSubmitted: (value) {
+                        if (value.isNotEmpty) {
+                          navigateToSearchResults(value);
+                        }
+                      },
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value;
+                        });
+                      },
+                    ),
                   ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    searchQuery = value;
-                  });
-                },
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Implement button functionality to trigger search
+                      final query =
+                          searchQuery; // Replace with the actual query from TextField
+                      if (query.isNotEmpty) {
+                        navigateToSearchResults(query);
+                      }
+                    },
+                    child: Text('Ara'),
+                  ),
+                ],
               ),
             ),
             // Öne Çıkanlar Bölümü
@@ -301,7 +387,8 @@ class _HomePageState extends State<HomePage> {
             // Genel Akış
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: selectedIndex == 1 ? ilanlarStream : dersNotlariStream,
+                stream:
+                    selectedIndex == 1 ? getIlanlarStream() : dersNotlariStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
@@ -319,73 +406,46 @@ class _HomePageState extends State<HomePage> {
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      return FutureBuilder<DocumentSnapshot>(
-                        future:
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(item['userId'])
-                                .get(),
-                        builder: (context, userSnapshot) {
-                          if (userSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return Center(child: CircularProgressIndicator());
-                          }
-                          if (userSnapshot.hasError || !userSnapshot.hasData) {
-                            return ListTile(
-                              title: Text(
-                                selectedIndex == 1
-                                    ? item['title'] ?? 'Başlık yok'
-                                    : item['fileName'] ?? 'Dosya adı yok',
+                      return Card(
+                        margin: EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 15,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        elevation: 5,
+                        child: ListTile(
+                          leading: Icon(
+                            selectedIndex == 1
+                                ? Icons.announcement
+                                : Icons.file_present,
+                            color: Colors.blue.shade800,
+                          ),
+                          title: Text(
+                            selectedIndex == 1
+                                ? item['title'] ?? 'Başlık yok'
+                                : item['fileName'] ?? 'Dosya adı yok',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            selectedIndex == 1
+                                ? "${item['description'] ?? 'Açıklama yok'}\nTarih: ${item['timestamp']?.toDate().toString() ?? 'Tarih yok'}"
+                                : "Yükleme Tarihi: ${item['timestamp']?.toDate().toString() ?? 'Tarih yok'}",
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => FullScreenContentPage(
+                                      item: item,
+                                      selectedIndex: selectedIndex,
+                                    ),
                               ),
-                              subtitle: Text("Kullanıcı bilgisi alınamadı."),
                             );
-                          }
-                          final userData =
-                              userSnapshot.data!.data()
-                                  as Map<String, dynamic>?;
-                          final userEmail = userData?['email'] ?? 'Bilinmiyor';
-                          return Card(
-                            margin: EdgeInsets.symmetric(
-                              vertical: 10,
-                              horizontal: 15,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 5,
-                            child: ListTile(
-                              leading: Icon(
-                                selectedIndex == 1
-                                    ? Icons.announcement
-                                    : Icons.file_present,
-                                color: Colors.blue.shade800,
-                              ),
-                              title: Text(
-                                selectedIndex == 1
-                                    ? item['title'] ?? 'Başlık yok'
-                                    : item['fileName'] ?? 'Dosya adı yok',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                selectedIndex == 1
-                                    ? "${item['description'] ?? 'Açıklama yok'}\nE-posta: $userEmail\nTarih: ${item['timestamp']?.toDate().toString() ?? 'Tarih yok'}"
-                                    : "Yükleme Tarihi: ${item['timestamp']?.toDate().toString() ?? 'Tarih yok'}\nE-posta: $userEmail",
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => FullScreenContentPage(
-                                          item: item,
-                                          selectedIndex: selectedIndex,
-                                        ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
+                          },
+                        ),
                       );
                     },
                   );
@@ -394,42 +454,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
-        onTap: (index) async {
-          if (index == 1) {
-            // Profil button
-            final user = FirebaseAuth.instance.currentUser;
-            if (user != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => ProfilePage(
-                        userName: user.displayName ?? 'Kullanıcı',
-                        email: user.email ?? 'Email bulunamadı',
-                        firstName: null,
-                        lastName: null,
-                      ),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Giriş yapmanız gerekiyor.')),
-              );
-            }
-          } else {
-            setState(() {
-              selectedIndex = index;
-            });
-          }
-        },
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'İlanlarım'),
-        ],
       ),
     );
   }
@@ -548,7 +572,7 @@ class FullScreenContentPage extends StatelessWidget {
             children: [
               if (selectedIndex == 1)
                 Text("Açıklama: ${item['description'] ?? 'Açıklama yok'}"),
-              Text("E-posta: ${user?.email ?? 'Bilinmiyor'}"),
+              Text("E-posta: ${item['userEmail'] ?? 'Bilinmiyor'}"),
               Text(
                 "Tarih: ${item['timestamp']?.toDate().toString() ?? 'Tarih yok'}",
               ),

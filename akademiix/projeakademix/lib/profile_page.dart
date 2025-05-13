@@ -1,15 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:dio/dio.dart';
 import 'package:projeakademix/home_page.dart';
 import 'package:projeakademix/login_page.dart';
 import 'package:url_launcher/url_launcher.dart';
-// Import the EditProfilePage class
+import 'package:badges/badges.dart' as custom_badges;
 import 'edit_profile_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -139,6 +136,53 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Stream<QuerySnapshot> getNotificationsStream() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .snapshots();
+  }
+
+  Future<void> handleNotification(
+    String notificationId,
+    bool isAccepted,
+  ) async {
+    final notificationRef = FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(notificationId);
+
+    await notificationRef.update({
+      'status': isAccepted ? 'accepted' : 'rejected',
+    });
+
+    if (isAccepted) {
+      final notification = await notificationRef.get();
+      final senderId = notification['senderId'];
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'senderId': FirebaseAuth.instance.currentUser?.uid,
+        'receiverId': senderId,
+        'type': 'response',
+        'status': 'accepted',
+        'message':
+            'İsteğiniz kabul oldu. Diğer işlemler için mailim ile iletişime geçiniz.',
+
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Stream<int> getPendingNotificationsCount() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,6 +225,248 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
         actions: [
+          StreamBuilder<int>(
+            stream: getPendingNotificationsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return IconButton(
+                icon: custom_badges.Badge(
+                  showBadge: count > 0,
+                  badgeContent: Text(
+                    count.toString(),
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  child: Icon(Icons.notifications),
+                ),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) {
+                      return Container(
+                        padding: EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Bildirimler',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Expanded(
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: getNotificationsStream(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                      child: Text(
+                                        'Bir hata oluştu: ${snapshot.error}',
+                                      ),
+                                    );
+                                  }
+                                  if (!snapshot.hasData ||
+                                      snapshot.data!.docs.isEmpty) {
+                                    return Center(
+                                      child: Text('Henüz bir bildirim yok.'),
+                                    );
+                                  }
+
+                                  final notifications = snapshot.data!.docs;
+
+                                  return ListView.builder(
+                                    itemCount: notifications.length,
+                                    itemBuilder: (context, index) {
+                                      final notification = notifications[index];
+                                      final senderId = notification['senderId'];
+                                      final status = notification['status'];
+
+                                      return FutureBuilder<DocumentSnapshot>(
+                                        future:
+                                            FirebaseFirestore.instance
+                                                .collection('users')
+                                                .doc(senderId)
+                                                .get(),
+                                        builder: (context, userSnapshot) {
+                                          if (userSnapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return ListTile(
+                                              title: Text(
+                                                'Bir kullanıcı ilanınıza özel ders isteği gönderdi.',
+                                              ),
+                                              subtitle: Text(
+                                                'Gönderen bilgisi yükleniyor...',
+                                              ),
+                                            );
+                                          }
+                                          if (userSnapshot.hasError ||
+                                              !userSnapshot.hasData ||
+                                              !userSnapshot.data!.exists) {
+                                            return ListTile(
+                                              title: Text(
+                                                'Bir kullanıcı ilanınıza özel ders isteği gönderdi.',
+                                              ),
+                                              subtitle: Text(
+                                                'Gönderen bilgisi alınamadı.',
+                                              ),
+                                            );
+                                          }
+
+                                          final senderEmail =
+                                              userSnapshot.data!['email'] ??
+                                              'Bilinmiyor';
+
+                                          return ListTile(
+                                            title: Text(
+                                              'Bir kullanıcı ilanınıza özel ders isteği gönderdi.',
+                                            ),
+                                            subtitle: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text('Gönderen: $senderEmail'),
+                                                Text('Durum: $status'),
+                                              ],
+                                            ),
+                                            trailing:
+                                                status == 'pending'
+                                                    ? Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        ElevatedButton(
+                                                          onPressed: () async {
+                                                            await FirebaseFirestore
+                                                                .instance
+                                                                .collection(
+                                                                  'notifications',
+                                                                )
+                                                                .doc(
+                                                                  notification
+                                                                      .id,
+                                                                )
+                                                                .update({
+                                                                  'status':
+                                                                      'accepted',
+                                                                });
+
+                                                            await FirebaseFirestore
+                                                                .instance
+                                                                .collection(
+                                                                  'notifications',
+                                                                )
+                                                                .add({
+                                                                  'senderId':
+                                                                      FirebaseAuth
+                                                                          .instance
+                                                                          .currentUser
+                                                                          ?.uid,
+                                                                  'receiverId':
+                                                                      notification['senderId'],
+                                                                  'type':
+                                                                      'response',
+                                                                  'status':
+                                                                      'accepted',
+                                                                  'message':
+                                                                      'İsteğiniz kabul oldu. Diğer işlemler için mailim ile iletişime geçiniz.',
+                                                                  'timestamp':
+                                                                      FieldValue.serverTimestamp(),
+                                                                });
+
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  'İstek kabul edildi.',
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                          child: Text(
+                                                            'Kabul Et',
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: 8),
+                                                        ElevatedButton(
+                                                          onPressed: () async {
+                                                            await FirebaseFirestore
+                                                                .instance
+                                                                .collection(
+                                                                  'notifications',
+                                                                )
+                                                                .doc(
+                                                                  notification
+                                                                      .id,
+                                                                )
+                                                                .update({
+                                                                  'status':
+                                                                      'rejected',
+                                                                });
+
+                                                            await FirebaseFirestore
+                                                                .instance
+                                                                .collection(
+                                                                  'notifications',
+                                                                )
+                                                                .add({
+                                                                  'senderId':
+                                                                      FirebaseAuth
+                                                                          .instance
+                                                                          .currentUser
+                                                                          ?.uid,
+                                                                  'receiverId':
+                                                                      notification['senderId'],
+                                                                  'type':
+                                                                      'response',
+                                                                  'status':
+                                                                      'rejected',
+                                                                  'message':
+                                                                      'Maalesef isteğiniz reddedildi.',
+                                                                  'timestamp':
+                                                                      FieldValue.serverTimestamp(),
+                                                                });
+
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  'İstek reddedildi.',
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                          child: Text('Reddet'),
+                                                        ),
+                                                      ],
+                                                    )
+                                                    : null,
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             icon: Icon(Icons.logout, size: 28),
             onPressed: () async {
@@ -540,10 +826,60 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
+                SizedBox(height: 24),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class NotificationsPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Bildirimler')),
+      body: StreamBuilder<QuerySnapshot>(
+        stream:
+            FirebaseFirestore.instance
+                .collection('notifications')
+                .where(
+                  'receiverId',
+                  isEqualTo: FirebaseAuth.instance.currentUser?.uid,
+                )
+                .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Bir hata oluştu: ${snapshot.error}'));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('Henüz bir bildirim yok.'));
+          }
+
+          final notifications = snapshot.data!.docs;
+
+          return ListView.builder(
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+              final status = notification['status'];
+
+              return Card(
+                child: ListTile(
+                  title: Text(
+                    'Bir kullanıcı ilanınıza özel ders isteği gönderdi.',
+                  ),
+                  subtitle: Text('Durum: $status'),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
