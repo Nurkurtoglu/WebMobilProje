@@ -101,6 +101,8 @@ class SearchResultsPage extends StatelessWidget {
                                           'status': 'pending',
                                           'timestamp':
                                               FieldValue.serverTimestamp(),
+                                          'lessonTitle': item['title'],
+                                          'senderEmail': currentUser.email,
                                         });
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -405,10 +407,28 @@ class NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestTime =
+        notification['requestTime'] != null
+            ? DateTime.parse(notification['requestTime']).toLocal()
+            : null;
+    final responseTime =
+        notification['responseTime'] != null
+            ? DateTime.parse(notification['responseTime']).toLocal()
+            : null;
+
     return Card(
       child: ListTile(
         title: Text('Bir kullanıcı ilanınıza özel ders isteği gönderdi.'),
-        subtitle: Text('Gönderen: ${notification['senderEmail']}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Gönderen: ${notification['senderEmail']}'),
+            if (requestTime != null)
+              Text('İstek Tarihi: ${requestTime.toString().split('.')[0]}'),
+            if (responseTime != null)
+              Text('İşlem Tarihi: ${responseTime.toString().split('.')[0]}'),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -427,6 +447,10 @@ class NotificationCard extends StatelessWidget {
                   'message':
                       'Kullanıcı ${FirebaseAuth.instance.currentUser?.email} adresinden iletişime geçebilirsiniz.',
                   'timestamp': FieldValue.serverTimestamp(),
+                  'requestTime':
+                      notification['requestTime'] ??
+                      DateTime.now().toIso8601String(),
+                  'responseTime': DateTime.now().toIso8601String(),
                 });
 
                 ScaffoldMessenger.of(
@@ -452,6 +476,10 @@ class NotificationCard extends StatelessWidget {
                       'status': 'rejected',
                       'message': 'Maalesef isteğiniz reddedildi.',
                       'timestamp': FieldValue.serverTimestamp(),
+                      'requestTime':
+                          notification['requestTime'] ??
+                          DateTime.now().toIso8601String(),
+                      'responseTime': DateTime.now().toIso8601String(),
                     });
 
                 ScaffoldMessenger.of(

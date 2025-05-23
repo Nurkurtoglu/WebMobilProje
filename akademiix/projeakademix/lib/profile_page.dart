@@ -29,64 +29,114 @@ class _ProfilePageState extends State<ProfilePage> {
   String ilanBasligi = '';
   String ilanAciklamasi = '';
 
+  String _selectedLessonName = '';
+  String _selectedWeek = '';
+
   Future<void> _pickFile(BuildContext context) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [
-          'pdf',
-          'doc',
-          'docx',
-          'jpg',
-          'png',
-        ], // Genişletilmiş formatlar
-      );
-
-      if (result != null) {
-        final fileName = result.files.single.name;
-        debugPrint('Seçilen dosya adı: $fileName');
-
-        if (result.files.single.bytes != null) {
-          final fileBytes = result.files.single.bytes!;
-          debugPrint('Dosya boyutu (bytes): ${fileBytes.length}');
-
-          // Firebase Storage'a dosya yükleme
-          final storageRef = FirebaseStorage.instance.ref().child(
-            'ders_notlari/${FirebaseAuth.instance.currentUser?.uid}/$fileName',
+    // Önce form dialogunu göster
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Ders Notu Yükleme'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Ders Adı',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  _selectedLessonName = value;
+                },
+              ),
+              SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Hafta',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  _selectedWeek = value;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text('İptal'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Devam Et'),
+              onPressed: () async {
+                if (_selectedLessonName.isEmpty || _selectedWeek.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Lütfen tüm alanları doldurun')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    ).then((value) async {
+      if (value == true) {
+        try {
+          final result = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'png'],
           );
 
-          final uploadTask = storageRef.putData(fileBytes);
+          if (result != null && result.files.single.bytes != null) {
+            final fileBytes = result.files.single.bytes!;
+            final originalFileName = result.files.single.name;
+            final fileExtension = originalFileName.split('.').last;
 
-          // Yükleme tamamlandıktan sonra dosya URL'sini al
-          final snapshot = await uploadTask.whenComplete(() {});
-          final downloadUrl = await snapshot.ref.getDownloadURL();
-          debugPrint('Dosya başarıyla yüklendi: $downloadUrl');
+            // Yeni dosya adı formatı: DersAdi HaftaX.uzanti
+            final newFileName =
+                '${_selectedLessonName} ${_selectedWeek}. hafta.$fileExtension';
 
-          // Firestore'a dosya referansı ekleme
-          await FirebaseFirestore.instance.collection('ders_notlari').add({
-            'fileName': fileName,
-            'fileUrl': downloadUrl,
-            'userId': FirebaseAuth.instance.currentUser?.uid,
-            'userEmail': FirebaseAuth.instance.currentUser?.email,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
-          debugPrint('Firestore\'a belge başarıyla eklendi.');
+            // Firebase Storage'a dosya yükleme
+            final storageRef = FirebaseStorage.instance.ref().child(
+              'ders_notlari/${FirebaseAuth.instance.currentUser?.uid}/$newFileName',
+            );
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Dosya başarıyla yüklendi: $fileName")),
-          );
-        } else {
-          throw Exception("Web platformunda dosya seçimi başarısız.");
+            final uploadTask = storageRef.putData(fileBytes);
+            final snapshot = await uploadTask.whenComplete(() {});
+            final downloadUrl = await snapshot.ref.getDownloadURL();
+
+            // Firestore'a dosya referansı ekleme
+            await FirebaseFirestore.instance.collection('ders_notlari').add({
+              'fileName': '${_selectedLessonName} ${_selectedWeek}. hafta',
+              'fileUrl': downloadUrl,
+              'userId': FirebaseAuth.instance.currentUser?.uid,
+              'userEmail': FirebaseAuth.instance.currentUser?.email,
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '$_selectedLessonName - Hafta $_selectedWeek notu başarıyla yüklendi',
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Bir hata oluştu: $e')));
         }
-      } else {
-        throw Exception("Dosya seçimi iptal edildi.");
       }
-    } catch (e) {
-      debugPrint('Dosya yükleme hatası: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Bir hata oluştu: $e")));
-    }
+    });
   }
 
   Future<void> _addIlan(BuildContext context) async {
@@ -136,11 +186,31 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Stream<int> getPendingNotificationsCount() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return Stream.value(0);
+
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) {
+          try {
+            return snapshot.docs.length;
+          } catch (e) {
+            debugPrint('Bildirim sayısı alınırken hata: $e');
+            return 0;
+          }
+        });
+  }
+
   Stream<QuerySnapshot> getNotificationsStream() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     return FirebaseFirestore.instance
         .collection('notifications')
         .where('receiverId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
         .snapshots();
   }
 
@@ -148,39 +218,48 @@ class _ProfilePageState extends State<ProfilePage> {
     String notificationId,
     bool isAccepted,
   ) async {
-    final notificationRef = FirebaseFirestore.instance
-        .collection('notifications')
-        .doc(notificationId);
+    try {
+      final timestamp = FieldValue.serverTimestamp();
+      final notificationRef = FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(notificationId);
 
-    await notificationRef.update({
-      'status': isAccepted ? 'accepted' : 'rejected',
-    });
-
-    if (isAccepted) {
+      // Mevcut bildirimi al
       final notification = await notificationRef.get();
-      final senderId = notification['senderId'];
+      final notificationData = notification.data() as Map<String, dynamic>;
+      final senderId = notificationData['senderId'];
+      final lessonTitle = notificationData['lessonTitle'] ?? 'Belirtilmemiş';
 
+      // Mevcut bildirimi güncelle
+      await notificationRef.update({
+        'status': isAccepted ? 'accepted' : 'rejected',
+        'updatedAt': timestamp,
+        'responseTime': DateTime.now().toIso8601String(),
+        'unread': false,
+      });
+
+      // Karşı tarafa bildirim gönder
       await FirebaseFirestore.instance.collection('notifications').add({
         'senderId': FirebaseAuth.instance.currentUser?.uid,
         'receiverId': senderId,
         'type': 'response',
-        'status': 'accepted',
+        'status': isAccepted ? 'accepted' : 'rejected',
         'message':
-            'İsteğiniz kabul oldu. Diğer işlemler için mailim ile iletişime geçiniz.',
-
-        'timestamp': FieldValue.serverTimestamp(),
+            isAccepted
+                ? '$lessonTitle dersi için isteğiniz kabul edildi.'
+                : '$lessonTitle dersi için isteğiniz reddedildi.',
+        'lessonTitle': lessonTitle,
+        'timestamp': timestamp,
+        'requestTime':
+            notificationData['requestTime'] ?? DateTime.now().toIso8601String(),
+        'responseTime': DateTime.now().toIso8601String(),
+        'read': false,
+        'unread': true,
       });
+    } catch (e) {
+      debugPrint('Bildirim güncelleme hatası: $e');
+      throw e;
     }
-  }
-
-  Stream<int> getPendingNotificationsCount() {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    return FirebaseFirestore.instance
-        .collection('notifications')
-        .where('receiverId', isEqualTo: userId)
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
   }
 
   @override
@@ -258,7 +337,26 @@ class _ProfilePageState extends State<ProfilePage> {
                             SizedBox(height: 8),
                             Expanded(
                               child: StreamBuilder<QuerySnapshot>(
-                                stream: getNotificationsStream(),
+                                stream:
+                                    FirebaseFirestore.instance
+                                        .collection('notifications')
+                                        .where(
+                                          'receiverId',
+                                          isEqualTo:
+                                              FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.uid,
+                                        )
+                                        .where(
+                                          'status',
+                                          whereIn: [
+                                            'pending',
+                                            'accepted',
+                                            'rejected',
+                                          ],
+                                        )
+                                        .snapshots(),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
@@ -319,21 +417,115 @@ class _ProfilePageState extends State<ProfilePage> {
                                               ),
                                             );
                                           }
-
                                           final senderEmail =
                                               userSnapshot.data!['email'] ??
                                               'Bilinmiyor';
 
+                                          final notificationData =
+                                              notification.data()
+                                                  as Map<String, dynamic>;
+                                          final lessonTitle =
+                                              notificationData['lessonTitle']
+                                                  as String? ??
+                                              'Belirtilmemiş';
+                                          final type =
+                                              notificationData['type']
+                                                  as String? ??
+                                              '';
+                                          final message =
+                                              notificationData['message']
+                                                  as String? ??
+                                              '';
+
+                                          if (type == 'response') {
+                                            final responseTime =
+                                                notificationData['responseTime'];
+                                            return ListTile(
+                                              title: Text(message),
+                                              subtitle: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Ders: $lessonTitle'),
+                                                  if (responseTime != null)
+                                                    Text(
+                                                      'İşlem Tarihi: ${DateTime.parse(responseTime).toLocal().toString().split('.')[0]}',
+                                                    ),
+                                                ],
+                                              ),
+                                              leading: Icon(
+                                                status == 'accepted'
+                                                    ? Icons.check_circle
+                                                    : Icons.cancel,
+                                                color:
+                                                    status == 'accepted'
+                                                        ? Colors.green
+                                                        : Colors.red,
+                                              ),
+                                              trailing: IconButton(
+                                                icon: Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                ),
+                                                onPressed: () async {
+                                                  try {
+                                                    await FirebaseFirestore
+                                                        .instance
+                                                        .collection(
+                                                          'notifications',
+                                                        )
+                                                        .doc(notification.id)
+                                                        .delete();
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Bildirim başarıyla silindi',
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.green,
+                                                      ),
+                                                    );
+                                                  } catch (e) {
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Bildirim silinirken bir hata oluştu: $e',
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                },
+                                              ),
+                                            );
+                                          }
+
                                           return ListTile(
                                             title: Text(
-                                              'Bir kullanıcı ilanınıza özel ders isteği gönderdi.',
+                                              'Bir kullanıcı $lessonTitle dersi için özel ders isteği gönderdi.',
                                             ),
                                             subtitle: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Text('Gönderen: $senderEmail'),
+                                                Text('Ders: $lessonTitle'),
                                                 Text('Durum: $status'),
+                                                if ((notification.data()
+                                                        as Map<
+                                                          String,
+                                                          dynamic
+                                                        >)['responseTime'] !=
+                                                    null)
+                                                  Text(
+                                                    'İşlem Tarihi: ${DateTime.parse((notification.data() as Map<String, dynamic>)['responseTime']).toLocal().toString().split('.')[0]}',
+                                                  ),
                                               ],
                                             ),
                                             trailing:
@@ -342,110 +534,153 @@ class _ProfilePageState extends State<ProfilePage> {
                                                       mainAxisSize:
                                                           MainAxisSize.min,
                                                       children: [
-                                                        ElevatedButton(
-                                                          onPressed: () async {
-                                                            await FirebaseFirestore
-                                                                .instance
-                                                                .collection(
-                                                                  'notifications',
-                                                                )
-                                                                .doc(
-                                                                  notification
-                                                                      .id,
-                                                                )
-                                                                .update({
-                                                                  'status':
-                                                                      'accepted',
-                                                                });
-
-                                                            await FirebaseFirestore
-                                                                .instance
-                                                                .collection(
-                                                                  'notifications',
-                                                                )
-                                                                .add({
-                                                                  'senderId':
-                                                                      FirebaseAuth
-                                                                          .instance
-                                                                          .currentUser
-                                                                          ?.uid,
-                                                                  'receiverId':
-                                                                      notification['senderId'],
-                                                                  'type':
-                                                                      'response',
-                                                                  'status':
-                                                                      'accepted',
-                                                                  'message':
-                                                                      'İsteğiniz kabul oldu. Diğer işlemler için mailim ile iletişime geçiniz.',
-                                                                  'timestamp':
-                                                                      FieldValue.serverTimestamp(),
-                                                                });
-
-                                                            ScaffoldMessenger.of(
-                                                              context,
-                                                            ).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  'İstek kabul edildi.',
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
-                                                          child: Text(
-                                                            'Kabul Et',
+                                                        IconButton(
+                                                          icon: Icon(
+                                                            Icons.delete,
+                                                            color: Colors.red,
                                                           ),
+                                                          onPressed: () async {
+                                                            try {
+                                                              await FirebaseFirestore
+                                                                  .instance
+                                                                  .collection(
+                                                                    'notifications',
+                                                                  )
+                                                                  .doc(
+                                                                    notification
+                                                                        .id,
+                                                                  )
+                                                                  .delete();
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    'Bildirim başarıyla silindi',
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .green,
+                                                                ),
+                                                              );
+                                                            } catch (e) {
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    'Bildirim silinirken bir hata oluştu: $e',
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .red,
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
                                                         ),
                                                         SizedBox(width: 8),
                                                         ElevatedButton(
                                                           onPressed: () async {
-                                                            await FirebaseFirestore
-                                                                .instance
-                                                                .collection(
-                                                                  'notifications',
-                                                                )
-                                                                .doc(
-                                                                  notification
-                                                                      .id,
-                                                                )
-                                                                .update({
-                                                                  'status':
-                                                                      'rejected',
-                                                                });
-
-                                                            await FirebaseFirestore
-                                                                .instance
-                                                                .collection(
-                                                                  'notifications',
-                                                                )
-                                                                .add({
-                                                                  'senderId':
-                                                                      FirebaseAuth
-                                                                          .instance
-                                                                          .currentUser
-                                                                          ?.uid,
-                                                                  'receiverId':
-                                                                      notification['senderId'],
-                                                                  'type':
-                                                                      'response',
-                                                                  'status':
-                                                                      'rejected',
-                                                                  'message':
-                                                                      'Maalesef isteğiniz reddedildi.',
-                                                                  'timestamp':
-                                                                      FieldValue.serverTimestamp(),
-                                                                });
-
-                                                            ScaffoldMessenger.of(
-                                                              context,
-                                                            ).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  'İstek reddedildi.',
+                                                            try {
+                                                              await handleNotification(
+                                                                notification.id,
+                                                                true,
+                                                              );
+                                                              if (!context
+                                                                  .mounted)
+                                                                return;
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                const SnackBar(
+                                                                  content: Text(
+                                                                    'İstek kabul edildi.',
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                            );
+                                                              );
+                                                            } catch (e) {
+                                                              if (!context
+                                                                  .mounted)
+                                                                return;
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    'Bir hata oluştu: $e',
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .red,
+                                                                ),
+                                                              );
+                                                            }
                                                           },
-                                                          child: Text('Reddet'),
+                                                          style:
+                                                              ElevatedButton.styleFrom(
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .green,
+                                                                foregroundColor:
+                                                                    Colors
+                                                                        .white,
+                                                              ),
+                                                          child: const Text(
+                                                            'Kabul Et',
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        ElevatedButton(
+                                                          onPressed: () async {
+                                                            try {
+                                                              await handleNotification(
+                                                                notification.id,
+                                                                false,
+                                                              );
+                                                              if (!context
+                                                                  .mounted)
+                                                                return;
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                const SnackBar(
+                                                                  content: Text(
+                                                                    'İstek reddedildi.',
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            } catch (e) {
+                                                              if (!context
+                                                                  .mounted)
+                                                                return;
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    'Bir hata oluştu: $e',
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .red,
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
+                                                          style:
+                                                              ElevatedButton.styleFrom(
+                                                                backgroundColor:
+                                                                    Colors.red,
+                                                                foregroundColor:
+                                                                    Colors
+                                                                        .white,
+                                                              ),
+                                                          child: const Text(
+                                                            'Reddet',
+                                                          ),
                                                         ),
                                                       ],
                                                     )
@@ -713,9 +948,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                     leading: Icon(Icons.file_present),
                                     title: Text(
                                       not['fileName'] ?? 'Dosya adı yok',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue.shade800,
+                                      ),
                                     ),
                                     subtitle: Text(
-                                      "Yükleme Tarihi: ${not['timestamp']?.toDate().toString() ?? 'Tarih yok'}",
+                                      'Yükleme Tarihi: ${not['timestamp']?.toDate().toString().split('.')[0] ?? 'Tarih yok'}',
+                                      style: TextStyle(color: Colors.grey[600]),
                                     ),
                                     onTap: () async {
                                       final url = not['fileUrl'];
@@ -733,6 +973,51 @@ class _ProfilePageState extends State<ProfilePage> {
                                         );
                                       }
                                     },
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        try {
+                                          // Firestore'dan dosyayı sil
+                                          await FirebaseFirestore.instance
+                                              .collection('ders_notlari')
+                                              .doc(not.id)
+                                              .delete();
+
+                                          // Firebase Storage'dan dosyayı sil
+                                          if (not['fileUrl'] != null) {
+                                            final fileRef = FirebaseStorage
+                                                .instance
+                                                .refFromURL(not['fileUrl']);
+                                            await fileRef.delete();
+                                          }
+
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Ders notu başarıyla silindi.',
+                                              ),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Ders notu silinirken bir hata oluştu: $e',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
                                   ),
                                 );
                               },
@@ -815,6 +1100,42 @@ class _ProfilePageState extends State<ProfilePage> {
                                     title: Text(ilan['title'] ?? 'Başlık yok'),
                                     subtitle: Text(
                                       ilan['description'] ?? 'Açıklama yok',
+                                    ),
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        try {
+                                          await FirebaseFirestore.instance
+                                              .collection('ilanlar')
+                                              .doc(ilan.id)
+                                              .delete();
+
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'İlan başarıyla silindi.',
+                                              ),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'İlan silinirken bir hata oluştu: $e',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
                                     ),
                                   ),
                                 );
